@@ -38,6 +38,8 @@ import tensorflow as tf
 ###import os
 ###os.environ["CUDA_VISIBLE_DEVICES"]='0'
 
+
+
 # functions
 
 def get_session():
@@ -57,9 +59,66 @@ def clean_gpu_session():
 
 
 
+def getBinaryPreloadVGG16Inference(models, df, folder_path):
+
+    # return array(inference_neg, inference_pos)
+
+    #if(debug):
+        # print("Starting binary inference...")
+        # t_start_new = datetime.datetime.now()
+        # t_start_str_new = "[ %s ]" % t_start_new.strftime("%Y/%m/%d - %H:%M")
+        # print( t_start_str_new )
+
+
+    #vars
+    count_imgs = 0
+
+    inference_results = []
+    df_ii_inferences = pd.DataFrame( columns=('ii', 'bin-acc-neg', 'bin-acc-pos') ) #to link ii with bin-acc-X to can make a merge
+
+
+    #inference for each file
+    for index, row in df.iterrows():
+        file_name = row['filename']
+        img_path = join( folder_path, file_name )
+
+        # print("File: %s" % img_path)
+
+        if isfile( img_path ):
+
+            #mac files
+            if file_name.startswith('.DS_Store') or file_name.startswith('._'):
+                continue
+
+            img = load_img( img_path, target_size = (models.bin_model_img_width, models.bin_model_img_height) )
+
+            img = img_to_array( img )
+            img = img / 255
+            img = np.expand_dims( img, axis=0 )
+
+            inference = models.binary_classification_model.predict( img )
+            # POSITIVE : inference[0][1]
+            # NEGATIVE : inference[0][0]
+
+
+            inference_results.append((inference[0][0], inference[0][1]))
+
+            df_ii_inferences.loc[ 0 if pd.isnull( df_ii_inferences.index.max() ) else df_ii_inferences.index.max() + 1 ] = [int(row['ii'])] + [float(inference[0][0])] + [float(inference[0][1])]
+
+            count_imgs+=1
+
+
+    df_ii_inferences['ii'] = df_ii_inferences['ii'].astype(int)
+
+    return df_ii_inferences
+    #return np.array( inference_results )
+
+
+
+
 def getBinaryVGG16Inference(df, folder_path):
 
-    # return array(inference_c1, inference_c2, inference_c3, inference_c4, inference_c5, inference_c6)
+    # return array(inference_neg, inference_pos)
 
     # use this environment flag to change which GPU to use
     #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -154,6 +213,8 @@ def getBinaryVGG16Inference(df, folder_path):
             count_imgs+=1
 
 
+    df_ii_inferences['ii'] = df_ii_inferences['ii'].astype(int)
+
     #release gpu memory
     clean_gpu_session()
 
@@ -162,32 +223,42 @@ def getBinaryVGG16Inference(df, folder_path):
     #return np.array( inference_results )
 
 
+
 def getBinaryArtifactClassification(df):
 
     artifact_list_ids = df['artifact-id'].unique()
     df_artifacts_inferences = pd.DataFrame( columns=('artifact-id', 'artifact-bin-acc-neg', 'artifact-bin-acc-pos', 'artifact-bin-decision') ) #to link artifact-id with artifact-bin-acc-X and decision to can make a merge
 
 
-    ##for index, artifact_id in artifact_list_ids: ##nope --> TypeError: cannot unpack non-iterable numpy.int64 object
-
     for artifact_id in range(len(artifact_list_ids) ):
+    #for _, artifact_id in enumerate(artifact_list_ids): ###issue
         df_artifact = df[ df['artifact-id'] == artifact_list_ids[artifact_id] ]
+        #df_artifact = df[ df['artifact-id'] == artifact_id ]
 
+        print('len(df_artifact): %s' % (len(df_artifact)) )
 
         list_bin_acc_columns = np.array(['bin-acc-neg','bin-acc-pos'])
         artifact_inferences_means = df_artifact[ list_bin_acc_columns ].mean()
+
+        print('artifact_inferences_means: %s' % (artifact_inferences_means) )
 
         #print(artifact_inferences_means.max())
         # also with:  np.argmax( artifact_inferences_means.to_numpy() )
         #artifact_inferences_means.idxmax() --> bin-acc-pos (I need to vonver into 0-X index)
 
+        print('idxmax: %s' % ( artifact_inferences_means.idxmax() ) )
+        print('idxmax: %s' % ( np.where( list_bin_acc_columns == artifact_inferences_means.idxmax() ) ) )
         specie_index = np.where( list_bin_acc_columns == artifact_inferences_means.idxmax() )[0][0]
 
         df_artifacts_inferences.loc[ 0 if pd.isnull( df_artifacts_inferences.index.max() ) else df_artifacts_inferences.index.max() + 1 ] = \
-        np.array( [int( artifact_id + 1 )] + (artifact_inferences_means.to_numpy()).tolist() + [int( specie_index )] )
+        np.array( [int( artifact_list_ids[artifact_id] )] + (artifact_inferences_means.to_numpy()).tolist() + [int( specie_index )] )
+        #np.array( [int( artifact_id + 1 )] + (artifact_inferences_means.to_numpy()).tolist() + [int( specie_index )] )
+
+
 
     #convert from float to int
     df_artifacts_inferences['artifact-id'] = df_artifacts_inferences['artifact-id'].astype(int)
     df_artifacts_inferences['artifact-bin-decision'] = df_artifacts_inferences['artifact-bin-decision'].astype(int)
+
 
     return df_artifacts_inferences

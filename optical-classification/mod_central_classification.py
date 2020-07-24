@@ -1,5 +1,5 @@
 """
-Created on 2019-09-15
+Created on 2019-12-20
 @author: Ricardo Padrino - github.com/rpadrino - IMDEA Networks
 """
 #imports
@@ -21,25 +21,45 @@ import pandas as pd
 import argparse
 import sys
 
+###### USE ########
+# import:
+#    from mod_central_classification import *
+#
+# Main function (examples):
+#   centralClassification()
+#   centralClassification('guess')
+#   centralClassification('guess', './classification/', True)
+#   centralClassification(input_path='./classification/')
+#
+# optional parameters
+#   cameras_element: to provide the camera element to be processed: top, bottom. Default: guess
+#   input_path:      to provide where the local results (cameras) are. Default: ./classification/
+#   debug:           use for debugging [False by default].
+
+
 
 # config. and vars.
 
-input_folder = "./classification/" # the folder will contain the local results and other files from the species classification per each camera in subfolders
-###output_folder = "./classification/output/" # the folder will contain the final results and other files for the species classification
-output_folder = "output/" # the folder will contain the final results and other files for the species classification
-input_csv_file = "camera_classification.csv"
+input_classification_folder = "./classification/" # the folder will contain the local results and other files from the species classification per each camera in subfolders
+###output_classification_folder = "./classification/output/" # the folder will contain the final results and other files for the species classification
+output_classification_folder = "output/" # the folder will contain the final results and other files for the species classification
+input_classification_csv_file = "camera_classification.csv"
 ## CSV content: ......
-input_path_to_crops_file = "path_crops_folder.txt"
+input_classification_path_to_crops_file = "path_crops_folder.txt"
 
-output_best_file = "best_classification.txt"
-output_boundary_file = "boundary_targets.txt"
+output_classification_best_file = "best_classification.txt"
+output_detection_best_file = "best_detection.txt"
+#output_classification_boundary_file = "boundary_targets.txt"
 
 #recalculate values -  boundary areas
 boundary_area_left = int( ( 2048 * 10.5 ) / 70.5 ) #305pixels == 10.5degrees of overlapping
-boundary_area_right = 4096 - boundary_area_left
+boundary_area_right = 2048 - boundary_area_left
+
+working_in_folder_path = None
+working_out_folder_path = None
 
 
-#functions
+###### functions ########
 
 def getTimestampFromFilename(strr):
 
@@ -127,16 +147,16 @@ def checkCamerasElement(cameras_element):   #change name
         camera_folder_wpath = join( working_in_folder_path, camera_folder)
 
         if os.path.isdir( camera_folder_wpath ):
-            if isfile( join( camera_folder_wpath, input_csv_file) ):
+            if isfile( join( camera_folder_wpath, input_classification_csv_file) ):
                 cameras_element_present = True
                 break
 
     return cameras_element_present
 
 
-def getPathToCropsPerCamera(camera_name):
+def getPathToCropsPerCameraFromFile(camera_name):
 
-    path_crops_folder_file = join(working_in_folder_path, camera_name, input_path_to_crops_file)
+    path_crops_folder_file = join(working_in_folder_path, camera_name, input_classification_path_to_crops_file)
 
     path_crops_folder = open( path_crops_folder_file ).read().replace('\n','').replace('\r','')
 
@@ -182,7 +202,8 @@ def saveNumberOfFishesPerSpecies(df_list, folder_path):
         output_file = None
         status = None
         try:
-            output_file = open( '%s/%s.txt' % (working_out_folder_path, species_name), 'w') ##join()
+            #output_file = open( '%s/%s.txt' % (working_out_folder_path, species_name), 'w') ##join()
+            output_file = open( '%s/%s.txt' % (folder_path, species_name), 'w') ##join()
             output_file.write('%d\r\n' % (int(number_fishes) ) )
             output_file.close()
 
@@ -254,9 +275,9 @@ def processCamerasElement(cameras_element):
 
                 # ncam = camera_folder.split('.')[-1]
                 # ncam = int( ncam[:-1] ) #remove last '/'
-                if isfile( join( camera_folder_wpath, input_csv_file) ):
+                if isfile( join( camera_folder_wpath, input_classification_csv_file) ):
 
-                    df_cam = pd.read_csv( join( camera_folder_wpath, input_csv_file), header='infer' )
+                    df_cam = pd.read_csv( join( camera_folder_wpath, input_classification_csv_file), header='infer' )
                     #df_cam['ncam'] = np.array([ ncam ] * len(df) )
                     df_cam['ncam'] = ncam
 
@@ -328,7 +349,8 @@ def processCamerasElement(cameras_element):
 
             list_columns_final_order = np.array(['filename','acc','species-name','species'])
 
-            saving_result_best = saveResults( df_bestDetection[ list_columns_final_order ], working_out_folder_path, output_best_file)
+            #saving_result_best = saveResults( df_bestDetection[ list_columns_final_order ], working_out_folder_path, output_classification_best_file)
+            saving_result_best = saveResults( df_bestDetection[ list_columns_final_order ], working_out_folder_path, output_detection_best_file)
 
             #copy best file
             filename_best_result = df_bestDetection.head(1)['filename'].to_numpy()[0]
@@ -359,7 +381,7 @@ def processCamerasElement(cameras_element):
                 #saving_boundary_result +=
                 artifacts_in_boundary_per_cam = artifacts_in_boundary[ artifacts_in_boundary['ncam'] == cam_index ].reset_index(level=0, drop=True).copy()
 
-                path_for_filename = getPathToCropsPerCamera(camera_name)
+                path_for_filename = getPathToCropsPerCameraFromFile(camera_name)
                 artifacts_in_boundary_per_cam['filename'] = artifacts_in_boundary_per_cam['filename'].apply( getFilenameWithPath, prefix=path_for_filename )
 
                 saveResults( artifacts_in_boundary_per_cam, working_out_folder_path , "%s_boundary.txt" % camera_name[:-1] )
@@ -397,96 +419,113 @@ def cleanFilesInFolder(folder_path):
             os.remove( file_name_wPath )
 
 
-###### function-end ########
+###### functions-end ########
 
 
 
-# read parameters
-parser = argparse.ArgumentParser(description='Classification in central Jetson')
+###### main-function ########
 
-parser.add_argument("--cameras", dest='cameras_element', help="Parameter to provide the camera element will be processed: top, bottom. Default: guess", default='guess') #optinal
+def centralClassification(cameras_element='guess', input_path='./classification/', debug=False):
+    # call:
+    # centralClassification(), centralClassification('guess'), centralClassification('guess', './classification/', True),  centralClassification(input_path='./classification/')
+    #optional parameters
+    #cameras_element: Parameter to provide the camera element to be processed: top, bottom. Default: guess
+    #input_path: Parameter to provide where the local results (cameras) are. Default: ./classification/
+    #debug:  Use for debugging [False by default].
 
-parser.add_argument("--d", help="Parameter to provide where the local results (cameras) are. Default: ./classification/", default='') #optinal
+    global output_classification_folder
+    global working_in_folder_path
+    global working_out_folder_path
 
-parser.add_argument('--debug', dest='debug', help='Use for debuging [False by default].',action='store_true')  #optinal
-
-args = parser.parse_args()
-cameras_element = args.cameras_element
-path_d = args.d
-debug = args.debug
-
-if path_d != '':
-    input_folder = path_d
-    if not input_folder.endswith('/'): #just in case
-        input_folder += '/'
-    output_folder = input_folder + output_folder
-
-
-# cameras subfolder name format:
-# ./classification/cameraXX.Y
-# ./classification/camera20.6
-# ./classification/camera40.2
-
-# paths
-working_in_folder_path = os.path.abspath( input_folder )
-working_out_folder_path = os.path.abspath( output_folder )
+    if input_path != '':
+        input_classification_folder = input_path
+        if not input_classification_folder.endswith('/'): #just in case
+            input_classification_folder += '/'
+        output_classification_folder = input_classification_folder + output_classification_folder
 
 
+    # cameras subfolder name format:
+    # ./classification/cameraXX.Y
+    # ./classification/camera20.6
+    # ./classification/camera40.2
+
+    # paths
+    working_in_folder_path = os.path.abspath( input_classification_folder )
+    working_out_folder_path = os.path.abspath( output_classification_folder )
 
 
-# main
+    # main
 
-print("Starting classification...")
-t_start_new = datetime.datetime.now()
-t_start_str_new = "[ %s ]" % t_start_new.strftime("%Y/%m/%d - %H:%M")
-print( t_start_str_new )
+    print( "Starting classification..." )
+    t_start_new = datetime.datetime.now()
+    t_start_str_new = "[ %s ]" % t_start_new.strftime("%Y/%m/%d - %H:%M")
+    print( t_start_str_new )
+
+    print( "Input folder: %s\n" % (working_in_folder_path) )
 
 
-#checking output folder
-if not os.path.exists( working_out_folder_path ):
+    #checking output folder
+    if not os.path.exists( working_out_folder_path ):
 
-	print("Creating dir: " + str( working_out_folder_path ) )
-	print("")
-	os.makedirs( working_out_folder_path )
+    	print("Creating output folder: " + str( working_out_folder_path ) )
+    	print("")
+    	os.makedirs( working_out_folder_path )
 
-if checkCamerasElementParameter(cameras_element):
 
-    #clean previous results
-    cleanFilesInFolder( working_out_folder_path )
+    if checkCamerasElementParameter(cameras_element):
 
-    if cameras_element == 'top' or cameras_element == 'bottom':
-        if checkCamerasElement( cameras_element ):
-            print('Processing %s camera elements' % (cameras_element) )
-            if processCamerasElement( cameras_element ):
-                print('Successfull')
+        #clean previous results
+        cleanFilesInFolder( working_out_folder_path )
+
+        if cameras_element == 'top' or cameras_element == 'bottom':
+            if checkCamerasElement( cameras_element ):
+                print('Processing %s camera elements' % (cameras_element) )
+                if processCamerasElement( cameras_element ):
+                    print('Successfull')
+                    return 0 ## successful exit
+                else:
+                    print('Someting went wrong')
+                    return 1 ## exit with errors or warnings
             else:
-                 print('Someting went wrong')
+                print("Input data not found [%s]." % (cameras_element) )
+                print("")
+                return 1 ## exit with errors or warnings
         else:
-            print("Input data not found [%s]." % (cameras_element) )
-            print("")
+            if checkCamerasElement( 'top' ):
+                print('Processing %s camera elements' % ('top') )
+                if processCamerasElement( 'top' ):
+                    print('Successfull')
+                    return 0 ## successful exit
+                else:
+                    print('Someting went wrong')
+                    return 1 ## exit with errors or warnings
+
+            elif checkCamerasElement( 'bottom' ):
+                print('Processing %s camera elements' % ('bottom'))
+                if processCamerasElement( 'bottom' ):
+                    print('Successfull')
+                    return 0 ## successful exit
+                else:
+                    print('Someting went wrong')
+                    return 1 ## exit with errors or warnings
+
+            else:
+                print('There is no data to process.')
+                return 1 ## exit with errors or warnings
+
+
     else:
-        if checkCamerasElement( 'top' ):
-            print('Processing %s camera elements' % ('top') )
-            if processCamerasElement( 'top' ):
-                print('Successfull')
-            else:
-                 print('Someting went wrong')
+        #print("")
+        print('Cameras element unknown.')
+        print("'cameras_element' parameter was not properly provided.")
+        print('')
 
-        elif checkCamerasElement( 'bottom' ):
-            print('Processing %s camera elements' % ('bottom'))
-            if processCamerasElement( 'bottom' ):
-                print('Successfull')
-            else:
-                 print('Someting went wrong')
-        else:
-            print('There is no data to process.')
+        return 1 ## exit with errors or warnings
 
-else:
-    #print("")
-    print('Cameras element unknown.')
-    print("'--cameras' parameter was not properly provided.")
-    print('')
+
+###### main-function-end ########
 
 
 
-sys.exit(0)
+
+##sys.exit(0)
