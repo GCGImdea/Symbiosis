@@ -4,6 +4,7 @@ Repository for the Symbiosis project - Optical classification
 
 Main project webpage: http://symbiosis.networks.imdea.org/
 
+<br>
 
 SYMBIOSIS: A holistic opto-acoustic system for monitoring biodiversities
 <br>
@@ -42,18 +43,17 @@ Sea trial of the optical Symbiosis system in THEMO bouy, Haifa (Israel)
 
 ## Optical classification
 
-
 SYMBIOSIS Optic system pipeline
 
 ![SYMBIOSIS Optic system pipeline](images/Optical_system_schematic_Ver4d.png)
 
-
-The optical classification itself is divided in two steps, and both are using convolutional neural networks. The first runs a Deep Learning model for a binary classification. The second step runs a multi-class classifier. We use popular convolutional architectures: [VGG16](https://arxiv.org/abs/1409.1556) (binary classification) and [Francois Chollet’s simple architecture](https://blog.keras.io/building-powerful-image-classification-models-using-very-little-data.html) (multi-class classification). In the final version, we expect to use very small architectures designed by us.
+The optical classification itself is divided in two steps, and both are using convolutional neural networks. The first runs a Deep Learning model for a binary classification. The second step runs a multi-class classifier. We use popular convolutional architectures: [VGG16](https://arxiv.org/abs/1409.1556) (binary classification) and [Francois Chollet’s simple architecture](https://blog.keras.io/building-powerful-image-classification-models-using-very-little-data.html) (multi-class classification). In the final version, we expect to use very small architectures desgined by us.
 
 For tracking, we make use of [SORT](https://github.com/abewley/sort). This library must be placed in the same folder that our code.
-> If you deploy the code in a ARM-based system, numba libary is not avaliable for this architecture and you must to remove the improvements it introduces in sort.py file, comment @jit lines.
+> If you deploy the code in a ARM-based system, numba libary is not avaliable for this architecture and you must to remove the improvements it introduces in `sort.py` file, comment `@jit` lines.
 
 > It seems that the latest SORT version removes numba dependencies.
+
 
 Our final goal is the classification of an object (detected as a fish), which may appear in several frames, into one of seven classes (one class for each the six species of interest, and a seventh class for other species).
 
@@ -77,24 +77,59 @@ For more details see:
 <br>
 
 ## Usage
-This code version is the *command line interface* version (*CLI*). There is other code version as a module to facilitate integration (git branch).
+
+This code version is delivered as module to facilitate integration. We provide simple functions to run the classification and generate a final report.
+
+There is other code version (git branch) as *command line interface* version (*CLI*). This version provides the best classified segment instead of the best segmented segment.
+
 
 
 ### Script for camera units
 
+First you must import the module and its configuration file.
 ```python
-> python local_classification.py [--debug] [--d crops_folder_name]
+from mod_local_classification import *
+from mod_conf import *
+```
+
+Then, initialize and load the models.
+```python
+# CREATE MODELS
+cc_models = ClassifModels()
+
+# LOAD MODELS
+loadClassificationModels(cc_models)
+```
+
+Once you have loaded the models in memory, you can run the classification any time you need with `localClassification` function.
+```python
+# RUN CLASSIFICATION
+localClassification(models=cc_models, input_path='./crops/', debug=False)
+```
+
+Function `localClassification`
+```python
+localClassification(models, input_path, debug)
 
 Paramenters:
-        ‘--d “crops_folder_name”’, optional parameter to indicate a different path with the crops. By default, the expected crops folder is ‘./crops/’, in the same place that the script.
-        ‘--debug’, optional parameter to print debug info: intermediate classification results, etc.
+        ‘input_path’, optional parameter to provide segments to classify location from the previous fish detection stage. Default: ‘./crops/’.
+        ‘debug’, optional parameter for debugging. False by default.
+
 ```
 > The results are overwritten each time the script runs.
 
+
 Examples
-``` 
-> python local_classification.py --d ./segments/20200721-1030/
+```python
+# Main function (examples):
+localClassification()
+
+localClassification('./crops/', True)
+
+localClassification(input_path='./segments_20200723-1715/')
 ```
+
+
 <br>
 
 Input:
@@ -122,12 +157,12 @@ Output files:
 | file | description |
 |--|--|
 | `camera_classification.csv` | This file contains all the information needed to create a final report in the central unit: detection accuracy, position (coordinates), tracking information, binary and multi-class accuracies, grouped by tracking accuracies and species decision. |
-| `best_classification.txt` | One file with the best segment. It contains the file name to the segment + fish type estimation (species index) + accuray. |
-| `'best_classified_segment'.jpg` | This segment is best classified for a particular camera unit. |
+| `best_detection.txt` | One file with the best segment. It contains the file name to the segment + fish type estimation (species index) + accuray. |
+| `'best_segmented_segment'.jpg` | This segment is best segmented for a particular camera unit. |
 
 <br>
 
-Example `best_classification.txt` (content):
+Example `best_detection.txt` (content):
 ```
 filename,species,acc
 20180123-142707_268abfe571-frame513rectangle511_279_734_528acc0.97.jpg,3,0.9831473231315613
@@ -146,51 +181,84 @@ Example - folder structure for camera unit:
 <!-- ![Example of the folder structure for camera unit](images/Example_folder_structure_camera_unit.png) -->
 
 
+> In some parts of the code, you can find commented code snippets if you need to create your own debugging, for example, to visual inspect the tracking.
+
 <br>
 
 ### Script for central unit 
+
+Just import the module and run the classification to generate the report.
 ```python
-> python central_classification.py [--cameras cameras_array]
+from mod_central_classification import *
+
+# RUN CLASSIFICATION
+centralClassification(cameras_element='guess', input_path='./classification/', debug=False)
+```
+
+Function `centralClassification`
+
+```python
+centralClassification(cameras_element, input_path, debug)
 
 Paramenters:
-    ‘cameras_array’, optional parameter to indicate which camera array to process. Options: top, bottom, guess.
+    ‘cameras_element’, optional parameter to indicate which camera array to process. Options: top, bottom, guess.
     By default, the script try to process the files from the top array of cameras (and stop). If it is not available any file from that camaras array, it will try to process the bottom cameras array.
+    
+    ‘input_path’ , optional parameter to indicate the folder with the cameras' outputs. Default: './classification/'.
+    ‘debug’ , optional parameter for debugging. False by default.
 ```
 > Note: it can not process the two arrays at once, the results would be overwritten.
 
 Examples
-``` 
-> python central_classification.py --cameras top
-> python central_classification.py --cameras guess
+```python
+centralClassification()
+
+centralClassification('guess')
+
+centralClassification(cameras_element='bottom', './classification/', True)
+
+centralClassification(input_path='./classification_20200723-1715/')
+
 ```
+
 <br>
+
 Input: Sub folders (with particular name format) for each camera with files processed in each camera board.
 
 Expected camera name folder: 
 ```
-./classification/cameraXX.Y/
+[ input_path ]/cameraXX.Y/
 ```
 > XX.Y correspond to the last two IP number of each camera. The first of those indicates the camera array.
 
 Examples
 ```
-./classification/camera20.5/
-./classification/camera40.1/
+./classification_20200723-1715/camera20.5/
+./classification_20200723-1715/camera40.1/
 ```
+
 <br>
+
 Output path:
-./classification/output/
+[ input_path ]/output/
+
+Example
+```
+./classification_20200723-1715/output/
+```
+
 <br>
 
 Output files:
 | file | description |
 |--|--|
 | `'species'.txt` | One file for each of the 6 species, that contains the number of fishes found of that species (all cameras, array). See the example below. |
-| `best_classification.txt` | One file with the best segment for the cameras array. It contains the file name to the segment + accuray  + the fish type estimation (short name + species index). |
-| `'best_classified_segment'.jpg` |The best classified segment for the cameras array. |
-| `cameraXX.Y_boundary.txt` | One file for each camera following the filename format explained above. It contains camera + time of measurement + coordinates of segment + species (short name + index) (each detection in one line). |
+| `best_detection.txt` | One file with the best segment for the cameras array. It contains the file name to the segment + accuray  + the fish type estimation (short name + species index). |
+| `'best_segmented_segment'.jpg` | The best segmented segment for the cameras array. |
+| `cameraXX.Y_boundary.txt` | One file for each camera following the filename format explained above. It contains camera + time of measurement + coordinates of segment + species (short name + index) (each detection in one line). **NEW:** The filename includes the absolute path. The path will be slightly different for each camera. |
 
 <br>
+
 
 Example `'species'.txt`:
 ```
@@ -204,6 +272,7 @@ Example `best_classification.txt` (content):
 ```
 20180123_142707_001001frame513rectangle511_279_734_528acc0.97.jpg,0.9828381538391112,dorado,3
 ```
+
 Example `'best_classified_segment'.jpg` (filename):
 ```
 20180123-142707_268abfe571-frame513rectangle511_279_734_528acc0.97.jpg
@@ -214,11 +283,13 @@ Example `cameraXX.Y_boundary.txt`:
 ```
 camera20.1_boundary.txt
 ```
+
 Example `cameraXX.Y_boundary.txt` (content):
 ```
-1,20180123-142707_268abfe571-frame499rectangle861_480_1053_612acc0.97.jpg,861,480,1053,612,dorado,3
-1,20180123-142707_268abfe571-frame504rectangle83_446_380_639acc0.96.jpg,83,446,380,639,amberjack,1
+1,/path/to/camera/folder/20180123-142707_268abfe571-frame499rectangle861_480_1053_612acc0.97.jpg,861,480,1053,612,dorado,3
+1,/path/to/camera/folder/20180123-142707_268abfe571-frame504rectangle83_446_380_639acc0.96.jpg,83,446,380,639,amberjack,1
 ```
+
 <br>
 
 Example - folder structure for  central unit:
@@ -264,7 +335,7 @@ The cameras arrays are connected in net and the partial outputs need to be trans
 - numpy
 - scipy
 - filterpy (if installed with Anaconda, it is available in ‘conda-forge’)
-- numba   (optional, if not, check that is skipped in `sort.py` library. Not available for ARM)
+- numba   (optional, if not, check that is skipped in ‘sort.py’ library. Not available for ARM)
 - pandas
 - shutil
 

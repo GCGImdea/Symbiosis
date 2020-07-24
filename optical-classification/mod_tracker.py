@@ -34,7 +34,7 @@ def getCenterFromCoords(coords):
 def getCoordsMatchingMetric(orig_coords, tracker_coords):  #not in use
     #to MINIMIZE, the minimun value will be to right one.
     #Known issue: negative coordinates.
-    #To impruve, square pow for areas partial result to comparable to centers partial results (or remove square root).
+    #To improve, square pow for areas partial result to comparable to centers partial results (or remove square root).
 
     # arg min |A - A'| + ||pos - pos'||
     #         (area)      (centros)
@@ -100,7 +100,7 @@ def getTargetsId(df): #old name: getTargetsIdFromPandas
         #     folder_name = seq.split('rectangle')[0]
         #     #folder_name = seq.split('-frame')[0]
         #
-        #             ######## MODIFYYY
+        #             ######## MODIFYYY folder
         #     #fn = 'xxxxxxxxxxxxxxxxxxxx/%s/frames/%06d.jpg'%(folder_name,frame)
         #     fn = 'data/dorado/frames/%s-frame%s.png'%(folder_name, frame)
         #     im =io.imread(fn)
@@ -113,9 +113,7 @@ def getTargetsId(df): #old name: getTargetsIdFromPandas
 
 
 
-        ######## MODIFYYY
 
-        #trackers = artifact_tracker.update( (dets[:,:-1]).astype(float) ) #not working #'x1', 'y1', 'x2', 'y2', 'detection-acc', 'ii'
         trackers = artifact_tracker.update( dets_noindex ) #'x1', 'y1', 'x2', 'y2', 'detection-acc', 'ii'
         #return a np array where each row contains a valid bounding box and track_id (last column-1)
 
@@ -209,7 +207,7 @@ def getTargetsId(df): #old name: getTargetsIdFromPandas
 
             for index_internal_orig_coords in range( len(df_frame) ):
 
-                index_tracker = match_max_results[ index_internal_orig_coords ][0] #give the tracker index --> match with ID (use index to get ID in trackers[])
+                index_tracker = match_max_results[ index_internal_orig_coords ][0] #gives the tracker index --> match with ID (use index to get ID in trackers[])
 
                 artifact_id = trackers[ index_tracker ][4]
 
@@ -230,7 +228,7 @@ def getTargetsId(df): #old name: getTargetsIdFromPandas
         #     fig.canvas.flush_events()
         #     plt.draw()
         #
-        #     ######## MODIFYYY
+        #     ######## MODIFYYY folder
         #     name_fig = 'data/dorado/frames_wbbox/%s-frame%s.png'%(folder_name, frame)
         #     fig.savefig( name_fig )
         #     ax1.cla()

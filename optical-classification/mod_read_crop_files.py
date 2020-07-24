@@ -37,7 +37,7 @@ def countFiles(path):
 
 
 
-def getSegmentsAsDataframe(crops_folder_path): #old name: listSegmetsIntoPandas
+def getSegmentsAsDataframe(crops_folder_path):
 
     # counter and variables
     nframe = 0  # it will be updated to 1 in the first loop
@@ -78,7 +78,7 @@ def getSegmentsAsDataframe(crops_folder_path): #old name: listSegmetsIntoPandas
 
                 nframe = int(filename_splitted[0].split("frame")[-1])
 
-                #MAL #frame_coords_info = filename_splitted[-1].split(".")[0].split("acc")[0] #X_X_X_X_acc.ext -> X_X_X_X_
+                #WRONG #frame_coords_info = filename_splitted[-1].split(".")[0].split("acc")[0] #X_X_X_X_acc.ext -> X_X_X_X_
                 frame_coords_info = filename_splitted[-1].split("acc")[0] #[_]X_X_X_X[_]accZ.ZZ.ext -> [_]X_X_X_X[_]
                 if frame_coords_info.startswith('_'): #just in case
                     frame_coords_info = frame_coords_info[1:]

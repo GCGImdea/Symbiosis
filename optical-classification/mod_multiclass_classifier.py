@@ -49,9 +49,58 @@ def clean_gpu_session():
     sess.close()
 
 
+def getMulticlassPreloadCholletInference(models, df, folder_path):
+
+    # return array(inference_c1, inference_c2, inference_c3, inference_c4, inference_c5, inference_c6)
+
+    # print("Starting multiclass inference...")
+    # t_start_new = datetime.datetime.now()
+    # t_start_str_new = "[ %s ]" % t_start_new.strftime("%Y/%m/%d - %H:%M")
+    # print( t_start_str_new )
+
+
+    #vars
+    count_imgs = 0
+
+    inference_results = []
+    df_ii_inferences = pd.DataFrame( columns=('ii', 'multi-acc-0', 'multi-acc-1', 'multi-acc-2', 'multi-acc-3', 'multi-acc-4', 'multi-acc-5') ) #to link ii with 'multi-acc-X' to can make a merge
+
+
+    #inference for each file
+    for index, row in df.iterrows():
+        file_name = row['filename']
+        img_path = join( folder_path, file_name )
+        if isfile( img_path ):
+
+            #mac files
+            if file_name.startswith('.DS_Store') or file_name.startswith('._'):
+                continue
+
+            img = load_img( img_path, target_size = (models.multi_model_img_width, models.multi_model_img_height) )
+
+            img = img_to_array( img )
+            img = img / 255
+            img = np.expand_dims( img, axis=0 )
+
+            inference = models.multi_classification_model.predict( img )
+
+
+            inference_results.append((inference[0][0], inference[0][1], inference[0][2], inference[0][3], inference[0][4], inference[0][5]))
+
+            df_ii_inferences.loc[ 0 if pd.isnull( df_ii_inferences.index.max() ) else df_ii_inferences.index.max() + 1 ] = [int(row['ii'])] + [float(inference[0][0])] + [float(inference[0][1])] + [float(inference[0][2])] + [float(inference[0][3])] + [float(inference[0][4])] + [float(inference[0][5])]
+
+            count_imgs+=1
+
+    df_ii_inferences['ii'] = df_ii_inferences['ii'].astype(int)
+
+    return df_ii_inferences
+    #return inference_results
+
+
+
 def getMulticlassCholletInference(df, folder_path):
 
-    # return array(inference_neg, inference_pos)
+    # return array(inference_c1, inference_c2, inference_c3, inference_c4, inference_c5, inference_c6)
 
     # use this environment flag to change which GPU to use
     #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -135,6 +184,8 @@ def getMulticlassCholletInference(df, folder_path):
             count_imgs+=1
 
 
+    df_ii_inferences['ii'] = df_ii_inferences['ii'].astype(int)
+
     #release gpu memory
     clean_gpu_session()
 
@@ -151,8 +202,10 @@ def getMulticlassArtifactClassification(df):
 
     ##for index, artifact_id in artifact_list_ids: ##nope --> TypeError: cannot unpack non-iterable numpy.int64 object
 
-    for artifact_id in range(len(artifact_list_ids) ):
+    for artifact_id in range(len(artifact_list_ids) ):  ###issue
+    #for _, artifact_id in enumerate(artifact_list_ids):
         df_artifact = df[ df['artifact-id'] == artifact_list_ids[artifact_id] ]
+        #df_artifact = df[ df['artifact-id'] == artifact_id ]
 
 
         list_acc_columns = np.array(['multi-acc-0','multi-acc-1','multi-acc-2','multi-acc-3','multi-acc-4','multi-acc-5'])
@@ -160,12 +213,15 @@ def getMulticlassArtifactClassification(df):
 
         #print(artifact_inferences_means.max())
         # also with:  np.argmax( artifact_inferences_means.to_numpy() )
-        #artifact_inferences_means.idxmax() --> bin-acc-pos (I need to vonver into 0-X index)
+        #artifact_inferences_means.idxmax() --> bin-acc-pos (I need to convert into 0-X index)
 
         specie_index = np.where( list_acc_columns == artifact_inferences_means.idxmax() )[0][0]
 
         df_artifacts_inferences.loc[ 0 if pd.isnull( df_artifacts_inferences.index.max() ) else df_artifacts_inferences.index.max() + 1 ] = \
-        np.array( [int( artifact_id + 1 )] + (artifact_inferences_means.to_numpy()).tolist() + [int( specie_index )] )
+        np.array( [int( artifact_list_ids[artifact_id] )] + (artifact_inferences_means.to_numpy()).tolist() + [int( specie_index )] )
+        #np.array( [int( artifact_id + 1 )] + (artifact_inferences_means.to_numpy()).tolist() + [int( specie_index )] )
+
+
 
     #convert from float to int
     df_artifacts_inferences['artifact-id'] = df_artifacts_inferences['artifact-id'].astype(int)
@@ -190,14 +246,14 @@ def getBestArtifact(df):
     df_results[['filename','acc']] = max_element[['filename', max_col_name]]
     df_results.insert(1,'species', max_index_species)
 
-    return df_results.head(1) #filename, acc, species - check
+    return df_results.head(1) #filename, species, acc
 
 
 def getBestArtifactFromSegmentation(df):
     #also it is needed to save the multi-species acc
 
     df_max_segm = df.loc[df['detection-acc'].idxmax()] # get the row of max value (only one value)
-    df_max_segm_artifact_acc = df_max_segm[['artifac-multi-acc-0','artifac-multi-acc-1','artifac-multi-acc-2','artifac-multi-acc-3','artifac-multi-acc-4','artifac-multi-acc-5']]
+    df_max_segm_artifact_acc = df_max_segm[['artifact-multi-acc-0','artifact-multi-acc-1','artifact-multi-acc-2','artifact-multi-acc-3','artifact-multi-acc-4','artifact-multi-acc-5']]
 
     artifact_acc_max_val = df_max_segm_artifact_acc.max()
     artifact_max_col_name = df_max_segm_artifact_acc.astype('float64').idxmax() #to get the column name to export results // no more needed
@@ -213,7 +269,7 @@ def getBestArtifactFromSegmentation(df):
     df_results.insert(2,'acc', artifact_acc_max_val)
     #df_results.insert(2,'acc', df_max_segm[ artifact_max_col_name ] )
 
-    return df_results.head(1) #filename, acc, species - check
+    return df_results.head(1) #filename, species, acc
 
 
 
