@@ -224,9 +224,9 @@ def getTargetsId(df): #old name: getTargetsIdFromPandas
     #     wbbox_folder_path = working_folder_path + '/frames_wbbox'
     #     if not os.path.exists( wbbox_folder_path ):
     #
-    #     	print("[DEGUG] Creating dir: " + str( wbbox_folder_path ) )
-    #     	print("")
-    #     	os.makedirs( wbbox_folder_path )
+    #         print("[DEGUG] Creating dir: " + str( wbbox_folder_path ) )
+    #         print("")
+    #         os.makedirs( wbbox_folder_path )
     #
     #     plt.ion()
     #     fig = plt.figure(figsize=(15,10))
@@ -448,10 +448,10 @@ def localClassification(models, input_path='./crops/', debug=False):
     #if not os.path.exists( join( crops_folder_path, output_classification_folder ) ):
     if not os.path.exists( working_folder_path ):
 
-    	print("Creating dir: " + str( output_classification_folder ) )
+        print("Creating dir: " + str( output_classification_folder ) )
         print( str( working_folder_path ) )
-    	print("")
-    	os.makedirs( working_folder_path )
+        print("")
+        os.makedirs( working_folder_path )
 
 
 
